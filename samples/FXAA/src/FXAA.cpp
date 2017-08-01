@@ -261,6 +261,8 @@ void InitApp()
     D3DXVECTOR3 vecAtLight ( 0.0f, 0.0f, 0.0f );
     g_LightCamera.SetViewParams( &vecEyeLight, &vecAtLight );
 }
+#include <sstream>
+using namespace std ;
 
 
 //--------------------------------------------------------------------------------------
@@ -269,11 +271,56 @@ void InitApp()
 //--------------------------------------------------------------------------------------
 void RenderText()
 {
+	static bool TimeToUpdate = true ;
+	static bool FirstTime = true ;
+	static LARGE_INTEGER frequency;        // ticks per second
+	static LARGE_INTEGER t1, t2;           // ticks
+	static int vNumMissed = 0 ;
+	static int vTotalNumMissed = 0 ;
+	if (FirstTime)
+	{
+		// get ticks per second
+		QueryPerformanceFrequency(&frequency);
+		QueryPerformanceCounter(&t1);
+		FirstTime = false ;
+	}
+		
+	double elapsedTime;
+	static double elapsedTimeSinceLastUpdate = 0 ;
+	QueryPerformanceCounter(&t2);
+	elapsedTime = (t2.QuadPart - t1.QuadPart) * 1000.0 / frequency.QuadPart;
+	t1 = t2 ;
+	if (elapsedTime > 20)
+		vNumMissed ++ ;
+
+	elapsedTimeSinceLastUpdate += elapsedTime ;
+	if (elapsedTimeSinceLastUpdate > 10000)
+	{
+		TimeToUpdate = true ;
+		elapsedTimeSinceLastUpdate = 0 ;
+	}
+
+	if (TimeToUpdate)
+	{
+		vTotalNumMissed += vNumMissed ;
+		vNumMissed = 0 ;
+		TimeToUpdate = false ;
+	}
+
+
     g_pTxtHelper->Begin();
     g_pTxtHelper->SetInsertionPos( 5, 5 );
     g_pTxtHelper->SetForegroundColor( D3DXCOLOR( 1.0f, 1.0f, 0.0f, 1.0f ) );
-    g_pTxtHelper->DrawTextLine( DXUTGetFrameStats( DXUTIsVsyncEnabled() ) );
+	g_pTxtHelper->DrawTextLine(DXUTGetFrameStats(true)) ;
     g_pTxtHelper->DrawTextLine( DXUTGetDeviceStats() );
+	wostringstream wss;
+	wss << vNumMissed;
+	wss << " missed, next update in : " ;
+	wss << (10000 - elapsedTimeSinceLastUpdate) /1000.f ; 
+	wss << " s. Total missed: " ;
+	wss << vTotalNumMissed ;
+	wstring vChaine = wss.str() ;
+	g_pTxtHelper->DrawTextLine(vChaine.c_str()) ;
     g_pTxtHelper->End();
 }
 
@@ -856,6 +903,13 @@ bool CALLBACK ModifyDeviceSettings( DXUTDeviceSettings* pDeviceSettings, void* p
 //--------------------------------------------------------------------------------------
 void CALLBACK OnFrameMove( double fTime, float fElapsedTime, void* pUserContext )
 {
+		static float vAngle = 0.0f ;
+	// Setup the camera's view parameters
+    D3DXVECTOR3 vecEye( 7.0f, 7.0f, -7.0f );
+    D3DXVECTOR3 vecAt ( cos(vAngle)*5.0f+7,  0.0f, sin(vAngle)*5.0f-7);
+	vAngle += 0.01 ;
+    g_Camera.SetViewParams( &vecEye, &vecAt );
+
     // Update the camera's position based on user input 
     g_Camera.FrameMove( fElapsedTime );
     g_LightCamera.FrameMove( fElapsedTime );
